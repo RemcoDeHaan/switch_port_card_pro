@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import re
 import asyncio
+import os
 from typing import Dict, Any
 
 from pysnmp.hlapi.v3arch.asyncio import (
@@ -30,6 +31,26 @@ _SNMP_ENGINE = None
 _ENGINE_LOCK = asyncio.Lock()
 
 
+def _iter_pysnmp_mib_module_names(mib_builder):
+    """Yield bundled PySNMP MIB module names from file-backed MIB sources."""
+    seen = set()
+
+    for mib_source in mib_builder.get_mib_sources():
+        source_dir = getattr(mib_source, "_srcName", None)
+        if not source_dir or not os.path.isdir(source_dir):
+            continue
+
+        for root, _dirs, files in os.walk(source_dir):
+            for filename in files:
+                if not filename.endswith(".py") or filename == "__init__.py":
+                    continue
+
+                module_name = os.path.splitext(filename)[0]
+                if module_name not in seen:
+                    seen.add(module_name)
+                    yield module_name
+
+
 def _create_engine():
     """Create and warm PySNMP's engine before it is used on the event loop."""
     engine = SnmpEngine()
@@ -38,12 +59,18 @@ def _create_engine():
     # response. Home Assistant flags those file reads when they happen on the
     # event loop, so force the lazy work into the executor with engine creation.
     mib_builder = engine.get_mib_builder()
-    for module_name in (
+    module_names = [
         "SNMPv2-SMI",
+        "SNMPv2-TC",
+        "SNMPv2-CONF",
+        "SNMPv2-TM",
         "SNMPv2-MIB",
         "PYSNMP-SOURCE-MIB",
         "__SNMPv2-MIB",
-    ):
+    ]
+    module_names.extend(_iter_pysnmp_mib_module_names(mib_builder))
+
+    for module_name in dict.fromkeys(module_names):
         try:
             mib_builder.load_modules(module_name)
         except Exception as err:
