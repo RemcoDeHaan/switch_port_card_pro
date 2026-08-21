@@ -30,16 +30,39 @@ _SNMP_ENGINE = None
 _ENGINE_LOCK = asyncio.Lock()
 
 
+def _create_engine():
+    """Create and warm PySNMP's engine before it is used on the event loop."""
+    engine = SnmpEngine()
+
+    # PySNMP lazily loads a few bundled MIB modules during the first request and
+    # response. Home Assistant flags those file reads when they happen on the
+    # event loop, so force the lazy work into the executor with engine creation.
+    mib_builder = engine.get_mib_builder()
+    for module_name in (
+        "SNMPv2-SMI",
+        "SNMPv2-MIB",
+        "PYSNMP-SOURCE-MIB",
+        "__SNMPv2-MIB",
+    ):
+        try:
+            mib_builder.load_modules(module_name)
+        except Exception as err:
+            _LOGGER.debug("Unable to preload PySNMP MIB module %s: %s", module_name, err)
+
+    try:
+        mib_builder.import_symbols("SNMPv2-MIB", "snmpInPkts", "snmpOutPkts")
+    except Exception as err:
+        _LOGGER.debug("Unable to preload PySNMP MIB symbols: %s", err)
+
+    return engine
+
+
 async def _ensure_engine(hass):
     """Ensure SNMP engine is created (thread-safe)."""
     global _SNMP_ENGINE
     
     async with _ENGINE_LOCK:
         if _SNMP_ENGINE is None:
-            # Create engine in executor to avoid blocking
-            def _create_engine():
-                return SnmpEngine()
-            
             _SNMP_ENGINE = await hass.async_add_executor_job(_create_engine)
             _LOGGER.debug("SNMP engine created")
     
