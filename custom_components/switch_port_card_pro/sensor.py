@@ -252,12 +252,15 @@ class SwitchPortBaseEntity(SensorEntity):
             )
         except Exception:
             _LOGGER.error("Entity not available")
+            return False
 
     async def async_will_remove_from_hass(self) -> None:
-        if hasattr(self, '_unsub_coordinator') and self._unsub_coordinator:
+        if hasattr(self, "_unsub_coordinator") and self._unsub_coordinator:
             self._unsub_coordinator()
-        if hasattr(self, '_unsub_devinfo') and self._unsub_devinfo:
+            self._unsub_coordinator = None
+        if hasattr(self, "_unsub_devinfo") and self._unsub_devinfo:
             self._unsub_devinfo()
+            self._unsub_devinfo = None
         await super().async_will_remove_from_hass()
 
     async def async_added_to_hass(self) -> None:
@@ -297,7 +300,11 @@ class SwitchPortBaseEntity(SensorEntity):
                     sw_version=firmware,
                     )
             except Exception as err:
-                _LOGGER.error("Entity update failed for %s with error %s", self.host, err)
+                _LOGGER.error(
+                    "Entity update failed for %s with error %s",
+                    self.coordinator.host,
+                    err,
+                )
     
         # Run on each coordinator update
         self._unsub_devinfo = self.coordinator.async_add_listener(_update_device_info)

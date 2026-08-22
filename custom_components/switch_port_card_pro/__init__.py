@@ -291,11 +291,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Store coordinator
     hass.data[DOMAIN][entry.entry_id] = coordinator
 
+    # Populate coordinator data before entities are created and subscribed.
+    await coordinator.async_config_entry_first_refresh()
+
     # Forward to platforms
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-
-    # Background first refresh
-    await coordinator.async_config_entry_first_refresh()
 
     entry.async_on_unload(entry.add_update_listener(async_options_updated))
     return True
