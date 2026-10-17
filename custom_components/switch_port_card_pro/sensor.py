@@ -58,6 +58,7 @@ class SwitchPortCoordinator(DataUpdateCoordinator[SwitchPortData]):
         snmp_version: str,
         include_vlans: bool,
         update_seconds: int,
+        poe_port_index_offset: int = 0,
     ) -> None:
         super().__init__(
             hass,
@@ -75,6 +76,7 @@ class SwitchPortCoordinator(DataUpdateCoordinator[SwitchPortData]):
         self.mp_model = SNMP_VERSION_TO_MP_MODEL.get(snmp_version, 1)
         self.port_mapping = {}
         self.update_seconds = update_seconds
+        self.poe_port_index_offset = poe_port_index_offset
         self._last_total_bytes = 0
 
     async def _async_update_data(self) -> SwitchPortData:
@@ -135,6 +137,7 @@ class SwitchPortCoordinator(DataUpdateCoordinator[SwitchPortData]):
                 p = str(port)
                 port_info = self.port_mapping.get(port) or {}
                 if_index = port_info.get("if_index", port)  # fallback to port number if no mapping
+                poe_index = if_index + self.poe_port_index_offset
                 ports_data[p] = {
                     "status": "off",
                     "speed": 0,
@@ -147,8 +150,14 @@ class SwitchPortCoordinator(DataUpdateCoordinator[SwitchPortData]):
                     "port_custom": 0,
                 }
 
-                # Use the real if_index for all lookups
-                if any(if_index in t for t in (status, speed, rx, tx, poe_power)):
+                # Standard interface data uses ifIndex. Some switches expose PoE
+                # data under a separate port index; apply the configured offset
+                # only to the PoE tables.
+                if (
+                    any(if_index in table for table in (status, speed, rx, tx))
+                    or poe_index in poe_power
+                    or poe_index in poe_status
+                ):
                     HighLowSpeed = speed.get(if_index, 0)
                     if HighLowSpeed < 100000: # check if we use the 32 or 64 bit variant
                         HighLowSpeed = HighLowSpeed * 1000000 # convert to bps
@@ -159,14 +168,14 @@ class SwitchPortCoordinator(DataUpdateCoordinator[SwitchPortData]):
                         "tx": tx.get(if_index, 0),
                         "name": name.get(if_index, f"Port {port}"),
                         "vlan": vlan.get(if_index),
-                        "poe_power": poe_power.get(if_index, 0),
-                        "poe_status": poe_status.get(if_index, 0),
+                        "poe_power": poe_power.get(poe_index, 0),
+                        "poe_status": poe_status.get(poe_index, 0),
                         "port_custom": port_custom.get(if_index, 0),
                     })
 
                 total_rx += rx.get(if_index, 0)
                 total_tx += tx.get(if_index, 0)
-                total_poe_mw += poe_power.get(if_index, 0)
+                total_poe_mw += poe_power.get(poe_index, 0)
 
             # compute current totals (these are lifetime counters) in bytes
             current_total_bytes = total_rx + total_tx
