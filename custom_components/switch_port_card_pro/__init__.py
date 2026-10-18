@@ -21,7 +21,6 @@ from .const import (
     CONF_PORTS,
     CONF_INCLUDE_VLANS,
     CONF_SNMP_PORT,
-    CONF_POE_PORT_INDEX_OFFSET,
     SNMP_VERSION_TO_MP_MODEL,
     DEFAULT_BASE_OIDS,
     DEFAULT_SYSTEM_OIDS,
@@ -111,7 +110,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     snmp_version = entry.options.get("snmp_version", "v2c")
     snmp_port = entry.options.get(CONF_SNMP_PORT, DEFAULT_SNMP_PORT)
     mp_model = SNMP_VERSION_TO_MP_MODEL.get(snmp_version, 1)
-    poe_port_index_offset = entry.options.get(CONF_POE_PORT_INDEX_OFFSET, 0)
 
     # === PORT DISCOVERY WITH SMART FALLBACK ===
     detected = None
@@ -282,7 +280,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Create coordinator
     coordinator = SwitchPortCoordinator(
         hass, host, community, snmp_port, ports, base_oids, system_oids,
-        snmp_version, include_vlans, update_seconds, poe_port_index_offset
+        snmp_version, include_vlans, update_seconds
     )
     coordinator.device_name = entry.title
     coordinator.port_mapping = detected or {}  # Empty dict if detection failed

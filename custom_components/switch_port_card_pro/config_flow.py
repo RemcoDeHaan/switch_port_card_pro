@@ -23,7 +23,6 @@ from .const import (
     DEFAULT_BASE_OIDS,
     DEFAULT_SYSTEM_OIDS,
     CONF_SNMP_PORT,
-    CONF_POE_PORT_INDEX_OFFSET,
     DEFAULT_SNMP_PORT,
     CONF_OID_SYSNAME,
 )
@@ -97,7 +96,6 @@ class SwitchPortCardProConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         "oid_uptime": DEFAULT_SYSTEM_OIDS.get("uptime", ""),
                         "oid_poe_power": DEFAULT_SYSTEM_OIDS.get("poe_power", ""),
                         "oid_poe_status": DEFAULT_SYSTEM_OIDS.get("poe_status", ""),
-                        CONF_POE_PORT_INDEX_OFFSET: 0,
                         "oid_custom": DEFAULT_SYSTEM_OIDS.get("custom", ""),
                         "oid_port_custom": DEFAULT_SYSTEM_OIDS.get("port_custom", ""),
                         "update_interval": 20,
@@ -239,10 +237,6 @@ class SwitchPortCardProOptionsFlow(config_entries.OptionsFlow):
                     "oid_poe_status",
                     default=current.get("oid_poe_status", DEFAULT_SYSTEM_OIDS.get("poe_status", "")),
                 ): cv.string,
-                vol.Optional(
-                    CONF_POE_PORT_INDEX_OFFSET,
-                    default=current.get(CONF_POE_PORT_INDEX_OFFSET, 0),
-                ): vol.All(vol.Coerce(int), vol.Range(min=-10000, max=10000)),
                 vol.Optional(
                     "oid_custom",
                     default=current.get("oid_custom", DEFAULT_SYSTEM_OIDS.get("custom", "")),
